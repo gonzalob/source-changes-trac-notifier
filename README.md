@@ -18,7 +18,7 @@ Settings for this script must be installed in the repository's conf directory. I
  * trac.password : Password for the specified user
 
 ## Optional parameters ##
- * core.tag      : Tag to look for. See [TAG](#TAG) for details
+ * core.tag      : Tag to look for. See [TAG](#tag) for details
  * core.svnlook  : Path to the svnlook utility. Defaults to none (i.e. will be searched for in $PATH)
 
 # TAG #
