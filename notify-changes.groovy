@@ -1,7 +1,6 @@
 #!/usr/bin/groovy
-@Grab( group='commons-httpclient', module='commons-httpclient', version='3.1'   )
-@Grab( group='org.apache.xmlrpc' , module='xmlrpc-client'     , version='3.1.3' )
-import org.apache.xmlrpc.client.*
+@Grab( group='org.codehaus.groovy', module='groovy-xmlrpc', version='0.8' )
+import groovy.net.xmlrpc.*
 if( args.length < 2 ) throw new IllegalArgumentException( "This script is supposed to be invoked as an svn post commit hook. see http://svnbook.red-bean.com/en/1.4/svn.ref.reposhooks.post-commit.html" )
 def repo     = args[0]
 def revision = args[1]
@@ -11,16 +10,10 @@ def config   = new ConfigSlurper().parse( settings.toURL() )
 def notificationTag = config.core.tag     ?: /.*NOTIFY_CHANGE +ticket *= *(\d*).*/
 def svnlook         = config.core.svnlook ?: "svnlook"
 
-// crappy xmlrpc configuration
-def tracClient = new XmlRpcClient()
-tracClient.setTransportFactory(new XmlRpcCommonsTransportFactory(tracClient))
-def rpcClientConfig = new XmlRpcClientConfigImpl()
-rpcClientConfig.with {
- setBasicUserName(config.trac.username ?: "")
- setBasicPassword(config.trac.password ?: "")
- setServerURL(new URL(config.trac.url + "/login/xmlrpc"))
-}
-tracClient.setConfig(rpcClientConfig)
+def tracClient = new XMLRPCServerProxy(config.trac.url + "/login/xmlrpc")
+def tracUsername = config.trac.username ?: ""
+def tracPassword = config.trac.password ?: ""
+tracClient.setBasicAuth tracUsername, tracPassword
 
 def changed = "${svnlook} changed ${repo} --revision=${revision}".execute()
 changed.in.text.eachLine { action ->
@@ -33,7 +26,7 @@ changed.in.text.eachLine { action ->
     def ticket     = notification.group( 1 )
     // http://trac.edgewall.org/wiki/TracLinks
     String message = "Watched file source:${file} changed in revision r${revision}."
-    tracClient.execute( "ticket.update", [ ticket.toInteger(), message, [:], false ] )
+    tracClient.ticket.update [ ticket.toInteger(), message, [:], false ]
    }
   }
  }
