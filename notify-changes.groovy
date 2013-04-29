@@ -10,11 +10,7 @@ def config   = new ConfigSlurper().parse( settings.toURL() )
 def notificationTag = config.core.tag     ?: /.*NOTIFY_CHANGE +ticket *= *(\d*).*/
 def svnlook         = config.core.svnlook ?: "svnlook"
 
-def tracClient = new XMLRPCServerProxy(config.trac.url + "/login/xmlrpc")
-def tracUsername = config.trac.username ?: ""
-def tracPassword = config.trac.password ?: ""
-tracClient.setBasicAuth tracUsername, tracPassword
-
+def pendingNotifications = [:].withDefault { [] }
 def changed = "${svnlook} changed ${repo} --revision=${revision}".execute()
 changed.in.text.eachLine { action ->
  def file = action.substring(4)
@@ -23,12 +19,25 @@ changed.in.text.eachLine { action ->
   contents.in.text.eachLine { line ->
    def notification = line =~ notificationTag
    if( notification.matches() ) {
-    def ticket     = notification.group( 1 )
-    // http://trac.edgewall.org/wiki/TracLinks
-    String message = "Watched file source:${file} changed in revision r${revision}."
-    tracClient.ticket.update [ ticket.toInteger(), message, [:], false ]
+    def ticketNumber = notification.group( 1 )
+    pendingNotifications.get( ticketNumber ) << file
    }
   }
  }
 }
 
+def tracClient = new XMLRPCServerProxy(config.trac.url + "/login/xmlrpc")
+def tracUsername = config.trac.username ?: ""
+def tracPassword = config.trac.password ?: ""
+tracClient.setBasicAuth tracUsername, tracPassword
+// constants for fields in the ticket type in trac's xmlrpc api. see http://trac-hacks.org/wiki/XmlRpcPlugin#APIUsage
+def TICKET_ID    = 0
+def TIME_CHANGED = 2
+pendingNotifications.each { ticketNumber, sources ->
+    def ticket     = tracClient.ticket.get ticketNumber
+    // http://trac.edgewall.org/wiki/TracLinks
+    def sourceLinks = sources.collect { "source:" + it }.join(', ')
+    String message = "Watched file(s) ${sourceLinks} changed in revision r${revision}."
+    def attributes = [ 'action': 'leave', '_ts': ticket[TIME_CHANGED] ]
+    tracClient.ticket.update( ticket[TICKET_ID], message, attributes, false )
+}
