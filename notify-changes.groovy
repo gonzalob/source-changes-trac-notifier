@@ -39,5 +39,6 @@ pendingNotifications.each { ticketNumber, sources ->
     def sourceLinks = sources.collect { "source:" + it }.join(', ')
     String message = "Watched file(s) ${sourceLinks} changed in revision r${revision}."
     def attributes = [ 'action': 'leave', '_ts': ticket[TIME_CHANGED] ]
-    tracClient.ticket.update( ticket[TICKET_ID], message, attributes, false )
+    tracClient.ticket.update( ticket[TICKET_ID], message, attributes, true )
 }
+
